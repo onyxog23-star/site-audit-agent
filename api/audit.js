@@ -3,7 +3,7 @@
 //       -> inspect them -> AI writes a plain-English report.
 
 const UA = 'Mozilla/5.0 (compatible; SiteAuditAgent/1.0; +https://github.com/onyxog23-star)';
-const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 const MAX_EXTRA_PAGES = 3;
 const MAX_LINKS_TO_CHECK = 15;
 
@@ -318,21 +318,43 @@ function slim(p) {
   return { ...rest, internalLinkCount: internalLinks?.length || 0, externalLinkCount: externalLinks?.length || 0 };
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 async function askGemini(prompt) {
-  const r = await fetchT(
-    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: 'application/json', temperature: 0.3 },
-      }),
-    },
-    40000
-  );
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(`AI error: ${d.error?.message || r.status}`);
+  // Busy/overloaded errors (429, 500, 503) are usually temporary: wait and retry.
+  // Optionally fall back to a second model set in GEMINI_FALLBACK_MODEL.
+  const models = [MODEL, process.env.GEMINI_FALLBACK_MODEL].filter(Boolean);
+  const attempts = [...models.map((m) => [m, 0]), [MODEL, 2500], [models[models.length - 1], 5000]];
+  let lastError;
+  for (const [model, wait] of attempts) {
+    if (wait) await sleep(wait);
+    let r, d;
+    try {
+      r = await fetchT(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: 'application/json', temperature: 0.3 },
+          }),
+        },
+        25000
+      );
+      d = await r.json().catch(() => ({}));
+    } catch (e) {
+      lastError = e.name === 'AbortError' ? 'AI took too long to answer' : e.message;
+      continue;
+    }
+    if (r.ok) return parseGemini(d);
+    lastError = d.error?.message || `HTTP ${r.status}`;
+    if (![429, 500, 503].includes(r.status)) break; // real error (bad key, bad model): stop
+  }
+  throw new Error(`AI error: ${lastError}`);
+}
+
+function parseGemini(d) {
   const text = (d.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
   try {
     return JSON.parse(text.replace(/^```(json)?|```$/g, '').trim());
