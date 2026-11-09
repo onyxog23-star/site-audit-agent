@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Site Audit Agent</title>
+<meta name="description" content="Paste a website address and get a plain-English audit of SEO, speed, mobile and accessibility, with the top 5 fixes." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23121212'/><circle cx='14' cy='14' r='6' fill='none' stroke='%23d4ff3f' stroke-width='3'/><path d='M19 19l6 6' stroke='%23d4ff3f' stroke-width='3' stroke-linecap='round'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ink: #121212;
+    --ink-2: #3b3b3b;
+    --muted: #707070;
+    --line: #e6e3dc;
+    --paper: #f6f4ef;
+    --card: #ffffff;
+    --accent: #d4ff3f;
+    --good: #1f9d55;
+    --ok: #d98b00;
+    --poor: #d64545;
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 16px/1.55 Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, .display { font-family: "Space Grotesk", Inter, sans-serif; letter-spacing: -0.02em; margin: 0; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 20px; }
+
+  header.top { padding: 22px 0; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-family: "Space Grotesk"; }
+  .logo { width: 30px; height: 30px; border-radius: 8px; background: var(--ink); display: grid; place-items: center; }
+
+  .hero { padding: 56px 0 40px; }
+  .eyebrow { display: inline-block; font-size: 13px; font-weight: 600; background: var(--ink); color: var(--accent); padding: 5px 12px; border-radius: 99px; }
+  .hero h1 { font-size: clamp(36px, 6vw, 60px); line-height: 1.02; margin: 18px 0 14px; max-width: 760px; }
+  .hero p { color: var(--ink-2); font-size: 18px; max-width: 600px; margin: 0 0 30px; }
+
+  form.audit { display: flex; gap: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 8px; box-shadow: 0 10px 30px -18px rgba(0,0,0,.25); max-width: 720px; }
+  form.audit input { flex: 1; border: 0; outline: 0; font: inherit; font-size: 17px; padding: 12px 14px; background: transparent; min-width: 0; }
+  button { font: inherit; cursor: pointer; border: 0; }
+  .btn { background: var(--ink); color: #fff; font-weight: 600; padding: 12px 22px; border-radius: 12px; transition: transform .1s, opacity .2s; white-space: nowrap; }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:disabled { opacity: .5; cursor: wait; transform: none; }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  .code-row { margin-top: 10px; display: none; gap: 8px; max-width: 720px; }
+  .code-row.show { display: flex; }
+  .code-row input { flex: 1; font: inherit; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+  .hint { color: var(--muted); font-size: 14px; margin-top: 12px; }
+  .error { color: var(--poor); background: #fff1f1; border: 1px solid #f5caca; padding: 12px 16px; border-radius: 12px; margin-top: 16px; max-width: 720px; display: none; }
+
+  /* progress */
+  .progress { display: none; margin: 10px 0 60px; }
+  .progress.show { display: block; }
+  .steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; max-width: 520px; }
+  .steps li { display: flex; align-items: center; gap: 12px; color: var(--muted); }
+  .steps li .dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); flex: none; display: grid; place-items: center; font-size: 12px; }
+  .steps li.active { color: var(--ink); font-weight: 500; }
+  .steps li.active .dot { border-color: var(--ink); border-top-color: transparent; animation: spin .8s linear infinite; }
+  .steps li.done { color: var(--ink-2); }
+  .steps li.done .dot { background: var(--ink); border-color: var(--ink); color: var(--accent); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* results */
+  #results { display: none; padding-bottom: 80px; }
+  #results.show { display: block; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; }
+  .grid { display: grid; gap: 16px; }
+  .summary { display: grid; grid-template-columns: auto 1fr; gap: 28px; align-items: center; }
+  .ring { width: 132px; height: 132px; position: relative; }
+  .ring svg { transform: rotate(-90deg); }
+  .ring .num { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+  .ring .num b { font: 700 38px/1 "Space Grotesk"; display: block; }
+  .ring .num span { font-size: 12px; color: var(--muted); }
+  .grade { display: inline-block; font: 700 14px "Space Grotesk"; background: var(--accent); padding: 3px 10px; border-radius: 8px; margin-right: 8px; }
+  .site { color: var(--muted); font-size: 14px; word-break: break-all; }
+  .summary h2 { font-size: 26px; margin: 8px 0; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+
+  .scores { grid-template-columns: repeat(4, 1fr); }
+  .score { text-align: left; }
+  .score .label { font-size: 13px; color: var(--muted); }
+  .score .val { font: 700 32px/1.1 "Space Grotesk"; margin-top: 4px; }
+  .bar { height: 6px; background: #eeebe4; border-radius: 99px; margin-top: 10px; overflow: hidden; }
+  .bar i { display: block; height: 100%; border-radius: 99px; }
+
+  .section-title { font-size: 22px; margin: 40px 0 14px; display: flex; align-items: baseline; gap: 10px; }
+  .section-title small { font: 400 14px Inter; color: var(--muted); }
+
+  .fix { display: grid; grid-template-columns: 40px 1fr; gap: 16px; }
+  .fix .n { width: 40px; height: 40px; border-radius: 12px; background: var(--ink); color: var(--accent); display: grid; place-items: center; font: 700 18px "Space Grotesk"; }
+  .fix h3 { font-size: 18px; margin-bottom: 6px; }
+  .fix p { margin: 4px 0; color: var(--ink-2); }
+  .fix p b { color: var(--ink); font-weight: 600; }
+  .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .tag { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 99px; background: #f0eee8; color: var(--ink-2); }
+  .tag.High { background: #fde4e4; color: #a32626; }
+  .tag.Medium { background: #fff1d6; color: #8a5a00; }
+  .tag.Low { background: #e5f4ea; color: #17673a; }
+  .tag.qw { background: var(--accent); color: var(--ink); }
+
+  .two { grid-template-columns: 1fr 1fr; }
+  .sec h3 { font-size: 17px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .pill { font: 600 12px Inter; padding: 3px 10px; border-radius: 99px; text-transform: capitalize; }
+  .pill.good { background: #e5f4ea; color: var(--good); }
+  .pill.ok { background: #fff1d6; color: #8a5a00; }
+  .pill.poor { background: #fde4e4; color: var(--poor); }
+  ul.clean { margin: 0; padding-left: 18px; color: var(--ink-2); }
+  ul.clean li { margin: 4px 0; }
+
+  .agent li { margin-bottom: 10px; }
+  .agent .s { font-weight: 600; }
+  .agent pre { white-space: pre-wrap; font: 13px/1.5 ui-monospace, Menlo, monospace; color: var(--muted); margin: 2px 0 0; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  td { padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; word-break: break-word; }
+  td:first-child { color: var(--muted); width: 38%; }
+
+  footer { color: var(--muted); font-size: 13px; padding: 30px 0 40px; border-top: 1px solid var(--line); }
+
+  @media (max-width: 760px) {
+    .scores { grid-template-columns: repeat(2, 1fr); }
+    .two { grid-template-columns: 1fr; }
+    .summary { grid-template-columns: 1fr; }
+    form.audit { flex-direction: column; }
+  }
+  @media print {
+    body { background: #fff; }
+    header.top, .hero, .progress, .actions, footer { display: none !important; }
+    #results { display: block !important; padding: 0; }
+    .card { break-inside: avoid; box-shadow: none; }
+    .section-title { break-after: avoid; }
+  }
+</style>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap brand">
+      <span class="logo"><svg width="18" height="18" viewBox="0 0 32 32"><circle cx="14" cy="14" r="7" fill="none" stroke="#d4ff3f" stroke-width="3.5"/><path d="M19.5 19.5l6 6" stroke="#d4ff3f" stroke-width="3.5" stroke-linecap="round"/></svg></span>
+      Site Audit Agent
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero" id="hero">
+      <span class="eyebrow">AI website audit</span>
+      <h1>Find what's holding a website back.</h1>
+      <p>Paste a website address. The agent checks SEO, speed, mobile and accessibility, inspects the pages that matter, and gives you the top 5 fixes in plain English.</p>
+
+      <form class="audit" id="form">
+        <input id="url" type="text" inputmode="url" autocomplete="url" placeholder="example.com" aria-label="Website address" required />
+        <button class="btn" id="go" type="submit">Run audit</button>
+      </form>
+      <div class="code-row" id="codeRow">
+        <input id="code" type="password" placeholder="Access code" aria-label="Access code" />
+      </div>
+      <div class="error" id="error"></div>
+      <div class="hint">Takes about 30–60 seconds. Speed scores come from Google PageSpeed (mobile).</div>
+    </section>
+
+    <section class="progress" id="progress">
+      <ul class="steps" id="steps"></ul>
+    </section>
+
+    <section id="results"></section>
+  </main>
+
+  <footer class="wrap">Built by Sangliana Khiangte · Site Audit Agent v1</footer>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const colorFor = (n) => (n == null ? '#bbb' : n >= 90 ? 'var(--good)' : n >= 50 ? 'var(--ok)' : 'var(--poor)');
+
+const STEPS = [
+  'Opening the website',
+  'Checking SEO, links and mobile setup',
+  'Agent choosing pages to inspect',
+  'Running Google speed test',
+  'Writing your report',
+];
+let timer;
+
+function startProgress() {
+  const ul = $('#steps');
+  ul.innerHTML = STEPS.map((s) => `<li><span class="dot"></span>${s}</li>`).join('');
+  const items = [...ul.children];
+  let i = 0;
+  const tick = () => {
+    items.forEach((li, j) => { li.className = j < i ? 'done' : j === i ? 'active' : ''; if (j < i) li.firstChild.textContent = '✓'; });
+    if (i < items.length - 1) { i++; timer = setTimeout(tick, [3000, 6000, 9000, 14000][i - 1] || 8000); }
+  };
+  tick();
+  $('#progress').classList.add('show');
+}
+function stopProgress() { clearTimeout(timer); $('#progress').classList.remove('show'); }
+
+$('#form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const url = $('#url').value.trim();
+  if (!url) return;
+  $('#error').style.display = 'none';
+  $('#results').classList.remove('show');
+  $('#go').disabled = true;
+  $('#go').textContent = 'Auditing…';
+  startProgress();
+  try {
+    const r = await fetch('/api/audit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, code: $('#code').value }),
+    });
+    const data = await r.json().catch(() => ({ error: 'The server took too long or returned an error. Try again.' }));
+    if (r.status === 401 && data.needsCode) {
+      $('#codeRow').classList.add('show');
+      $('#code').focus();
+      throw new Error($('#code').value ? 'That access code is not right.' : 'Enter your access code, then run the audit again.');
+    }
+    if (!r.ok) throw new Error(data.error || 'Audit failed.');
+    render(data);
+  } catch (err) {
+    $('#error').textContent = err.message;
+    $('#error').style.display = 'block';
+  } finally {
+    stopProgress();
+    $('#go').disabled = false;
+    $('#go').textContent = 'Run audit';
+  }
+});
+
+function ring(score) {
+  const r = 56, c = 2 * Math.PI * r, off = c * (1 - (score || 0) / 100);
+  return `<div class="ring"><svg width="132" height="132"><circle cx="66" cy="66" r="${r}" stroke="#eeebe4" stroke-width="12" fill="none"/>
+    <circle cx="66" cy="66" r="${r}" stroke="${colorFor(score)}" stroke-width="12" fill="none" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}"/></svg>
+    <div class="num"><div><b>${score ?? '–'}</b><span>out of 100</span></div></div></div>`;
+}
+
+function render(d) {
+  const rep = d.report || {};
+  const s = d.speed?.scores;
+  const h = d.home || {};
+  const scoreTiles = [
+    ['Performance', s?.performance], ['Accessibility', s?.accessibility], ['Best practices', s?.bestPractices], ['SEO', s?.seo],
+  ].map(([l, v]) => `<div class="card score"><div class="label">${l}</div><div class="val" style="color:${colorFor(v)}">${v ?? '–'}</div>
+    <div class="bar"><i style="width:${v || 0}%;background:${colorFor(v)}"></i></div></div>`).join('');
+
+  const fixes = (rep.topFixes || []).map((f, i) => `
+    <div class="card fix"><div class="n">${i + 1}</div><div>
+      <h3>${esc(f.title)}</h3>
+      <p><b>Why:</b> ${esc(f.why)}</p>
+      <p><b>How:</b> ${esc(f.how)}</p>
+      <div class="tags"><span class="tag ${esc(f.impact)}">${esc(f.impact)} impact</span>
+        <span class="tag ${f.effort === 'Quick win' ? 'qw' : ''}">${esc(f.effort)}</span><span class="tag">${esc(f.category)}</span></div>
+    </div></div>`).join('');
+
+  const sections = (rep.sections || []).map((x) => `
+    <div class="card sec"><h3>${esc(x.name)} <span class="pill ${esc(x.status)}">${esc(x.status)}</span></h3>
+    <ul class="clean">${(x.findings || []).map((f) => `<li>${esc(f)}</li>`).join('')}</ul></div>`).join('');
+
+  const strengths = (rep.strengths || []).map((x) => `<li>${esc(x)}</li>`).join('');
+  const pages = (rep.pagesReviewed || []).map((p) => `<li><b>${esc(p.url)}</b><br>${esc(p.verdict)}</li>`).join('');
+  const agent = (d.steps || []).map((x) => `<li><div class="s">${esc(x.step)}</div><pre>${esc(x.detail)}</pre></li>`).join('');
+  const broken = h.brokenLinks?.broken || [];
+  const m = d.speed?.metrics || {};
+
+  const rows = [
+    ['Page title', h.title ? `${h.title} (${h.title.length} chars)` : 'Missing'],
+    ['Meta description', h.metaDescription ? `${h.metaDescription} (${h.metaDescription.length} chars)` : 'Missing'],
+    ['H1 heading', h.h1?.length ? h.h1.join(' · ') : 'None'],
+    ['Images without alt text', `${h.imagesMissingAlt ?? 0} of ${h.images ?? 0}`],
+    ['Broken links', broken.length ? broken.map((b) => `${b.url} (${b.status || 'no response'})`).join('\n') : `None found (checked ${h.brokenLinks?.checked ?? 0})`],
+    ['HTTPS', h.https ? 'Yes' : 'No'],
+    ['HTTP → HTTPS redirect', d.site?.httpRedirectsToHttps == null ? 'Not checked' : d.site.httpRedirectsToHttps ? 'Yes' : 'No'],
+    ['Mobile viewport', h.viewport ? 'Yes' : 'Missing'],
+    ['robots.txt / sitemap', `${d.site?.robotsTxt ? 'Yes' : 'No'} / ${d.site?.sitemap ? 'Yes' : 'No'}`],
+    ['Largest Contentful Paint', m.largestContentfulPaint || '–'],
+    ['Total Blocking Time', m.totalBlockingTime || '–'],
+    ['Layout shift (CLS)', m.cumulativeLayoutShift || '–'],
+    ['Server response (our test)', `${h.loadMs} ms · ${h.sizeKb} KB HTML`],
+  ].map(([k, v]) => `<tr><td>${esc(k)}</td><td style="white-space:pre-line">${esc(v)}</td></tr>`).join('');
+
+  $('#results').innerHTML = `
+    <div class="card summary">
+      ${ring(rep.overallScore)}
+      <div>
+        <div class="site">${esc(d.url)} · ${new Date(d.auditedAt).toLocaleString()}</div>
+        <h2><span class="grade">Grade ${esc(rep.grade || '–')}</span>Audit summary</h2>
+        <p style="margin:0;color:var(--ink-2)">${esc(rep.summary)}</p>
+        <div class="actions">
+          <button class="btn" onclick="window.print()">Download PDF</button>
+          <button class="btn ghost" id="copy">Copy summary</button>
+          <button class="btn ghost" onclick="window.scrollTo({top:0,behavior:'smooth'});document.getElementById('url').select()">New audit</button>
+        </div>
+      </div>
+    </div>
+
+    <h2 class="section-title">Google speed scores <small>mobile</small></h2>
+    ${s ? `<div class="grid scores">${scoreTiles}</div>` : `<div class="card">Speed test unavailable: ${esc(d.speed?.error)}</div>`}
+
+    <h2 class="section-title">Top 5 fixes <small>in order of impact</small></h2>
+    <div class="grid">${fixes}</div>
+
+    <h2 class="section-title">Breakdown</h2>
+    <div class="grid two">${sections}</div>
+
+    ${strengths ? `<h2 class="section-title">What's working</h2><div class="card"><ul class="clean">${strengths}</ul></div>` : ''}
+    ${pages ? `<h2 class="section-title">Pages the agent reviewed</h2><div class="card"><ul class="clean">${pages}</ul></div>` : ''}
+
+    <div class="grid two" style="margin-top:40px">
+      <div><h2 class="section-title" style="margin-top:0">Raw checks</h2><div class="card"><table>${rows}</table></div></div>
+      <div><h2 class="section-title" style="margin-top:0">What the agent did</h2><div class="card agent"><ul class="clean">${agent}</ul></div></div>
+    </div>`;
+
+  $('#copy').onclick = () => {
+    const text = `Website audit: ${d.url}\nScore ${rep.overallScore}/100 (Grade ${rep.grade})\n\n${rep.summary}\n\nTop fixes:\n` +
+      (rep.topFixes || []).map((f, i) => `${i + 1}. ${f.title} — ${f.how}`).join('\n');
+    navigator.clipboard.writeText(text).then(() => { $('#copy').textContent = 'Copied ✓'; setTimeout(() => ($('#copy').textContent = 'Copy summary'), 1800); });
+  };
+  $('#results').classList.add('show');
+  $('#results').scrollIntoView({ behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
